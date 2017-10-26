@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Binder;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.support.annotation.NonNull;
@@ -45,6 +46,8 @@ import com.google.cloud.speech.v1.StreamingRecognizeRequest;
 import com.google.cloud.speech.v1.StreamingRecognizeResponse;
 import com.google.protobuf.ByteString;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -73,6 +76,8 @@ import io.grpc.stub.StreamObserver;
 
 
 public class SpeechService extends Service {
+
+    public String gText = "";
 
     public interface Listener {
 
@@ -108,8 +113,12 @@ public class SpeechService extends Service {
     private SpeechGrpc.SpeechStub mApi;
     private static Handler mHandler;
 
+    // wonjin added;
+    public byte[] byteTotal = "".getBytes();
+
     private final StreamObserver<StreamingRecognizeResponse> mResponseObserver
             = new StreamObserver<StreamingRecognizeResponse>() {
+
         @Override
         public void onNext(StreamingRecognizeResponse response) {
             String text = null;
@@ -123,6 +132,7 @@ public class SpeechService extends Service {
                 }
             }
             if (text != null) {
+                gText = text;
                 for (Listener listener : mListeners) {
                     listener.onSpeechRecognized(text, isFinal);
                 }
@@ -242,7 +252,7 @@ public class SpeechService extends Service {
      *
      * @param sampleRate The sample rate of the audio.
      */
-    public void startRecognizing(int sampleRate) {
+    public void startRecognizing(int sampleRate, String language) {
         if (mApi == null) {
             Log.w(TAG, "API not ready. Ignoring the request.");
             return;
@@ -252,7 +262,7 @@ public class SpeechService extends Service {
         mRequestObserver.onNext(StreamingRecognizeRequest.newBuilder()
                 .setStreamingConfig(StreamingRecognitionConfig.newBuilder()
                         .setConfig(RecognitionConfig.newBuilder()
-                                .setLanguageCode(getDefaultLanguageCode())
+                                .setLanguageCode(language)
                                 .setEncoding(RecognitionConfig.AudioEncoding.LINEAR16)
                                 .setSampleRateHertz(sampleRate)
                                 .build())
@@ -273,10 +283,17 @@ public class SpeechService extends Service {
         if (mRequestObserver == null) {
             return;
         }
+        // wonjin added
+        byte[] tmp = new byte[byteTotal.length + data.length];
+        System.arraycopy(byteTotal, 0, tmp, 0, byteTotal.length);
+        System.arraycopy(data, 0, tmp, byteTotal.length, data.length);
+        byteTotal = tmp;
+
         // Call the streaming recognition API
         mRequestObserver.onNext(StreamingRecognizeRequest.newBuilder()
                 .setAudioContent(ByteString.copyFrom(data, 0, size))
-                .build());
+                .build()
+        );
     }
 
     /**
@@ -290,6 +307,19 @@ public class SpeechService extends Service {
         mRequestObserver = null;
     }
 
+    //wonjin added
+    public byte[] finishRecognizingNew() {
+        if (mRequestObserver == null) {
+            return "".getBytes();
+        }
+        mRequestObserver.onCompleted();
+        mRequestObserver = null;
+        return byteTotal;
+    }
+    public byte[] getByteTotal() {
+        return byteTotal;
+    }
+
     /**
      * Recognize all data from the specified {@link InputStream}.
      *
@@ -301,7 +331,7 @@ public class SpeechService extends Service {
                     RecognizeRequest.newBuilder()
                             .setConfig(RecognitionConfig.newBuilder()
                                     .setEncoding(RecognitionConfig.AudioEncoding.LINEAR16)
-                                    .setLanguageCode("en-US")
+                                    .setLanguageCode("ko-KR")
                                     .setSampleRateHertz(16000)
                                     .build())
                             .setAudio(RecognitionAudio.newBuilder()
@@ -494,6 +524,10 @@ public class SpeechService extends Service {
             return headers;
         }
 
+    }
+
+    public void initByteTotal() {
+        byteTotal = "".getBytes();
     }
 
 }
