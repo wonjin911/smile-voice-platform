@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.graphics.Color;
 import android.icu.util.Output;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -311,6 +312,7 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
         switch (item.getItemId()) {
             case R.id.action_file:
                 // wonjin added
+                mAdapter.clearResults();
                 recreate();
                 return true;
             default:
@@ -387,10 +389,13 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
                                 if (isFinal) {
                                     Log.i("onSpeechRecognized", "is final!");
 
+                                    int resultColor = 0;
+
                                     if (ACTIVATED == 0) {
                                         if (isActivationFunction(finalText)) {
                                             finalText = "브라이언";
                                             ACTIVATED = 1;
+                                            resultColor = 2;
                                             Log.i("on Response", "It is an Activation Function");
                                         } else {
                                             // if not, init byteTotal
@@ -419,14 +424,16 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
                                         ACTIVATED = 2;
                                     }
 
-                                    mText.setText(null);
-                                    mAdapter.addResult(finalText);
-                                    mRecyclerView.smoothScrollToPosition(0);
+                                    //mText.setText(null);
+                                    //mAdapter.addResult(finalText, resultColor);
+                                    //mRecyclerView.smoothScrollToPosition(0);
 
                                     // TODO : AUTH 인증여부 확인
                                     if (isPaymentFunction(finalText)) {
                                         Log.d("onSpeechRecognized", "this is a payment Function");
-                                        if (AUTH == 0) {
+                                        resultColor = 2;
+                                        //if (AUTH == 0) {
+                                        if (1 == 1) {
                                             byte[] byteReturn = mSpeechService.getByteTotal();
                                             String outputPath = saveWAVFile(byteReturn,  "payment.wav");
 
@@ -434,8 +441,14 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
                                             sendToAuthPay(outputPath);
                                         }
                                     } else {
-                                        sendToDiaglogflow(finalText);
+                                        if (ACTIVATED != 0) {
+                                            sendToDiaglogflow(finalText);
+                                        }
                                     }
+
+                                    mText.setText(null);
+                                    mAdapter.addResult(finalText, resultColor);
+                                    mRecyclerView.smoothScrollToPosition(0);
 
                                 } else {
                                     mText.setText(finalText);
@@ -460,6 +473,7 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
     private static class ResultAdapter extends RecyclerView.Adapter<ViewHolder> {
 
         private final ArrayList<String> mResults = new ArrayList<>();
+        private final ArrayList<Integer> mWho = new ArrayList<>();
 
         ResultAdapter(ArrayList<String> results) {
             if (results != null) {
@@ -475,6 +489,13 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
             holder.text.setText(mResults.get(position));
+            if (mWho.get(position) == 1) {
+                holder.text.setTextColor(Color.BLUE);
+            } else if (mWho.get(position) == 2) {
+                holder.text.setTextColor(Color.RED);
+            } else {
+                holder.text.setTextColor(Color.BLACK);
+            }
         }
 
         @Override
@@ -482,13 +503,19 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
             return mResults.size();
         }
 
-        void addResult(String result) {
+        void addResult(String result, int who) {
             mResults.add(0, result);
+            mWho.add(0, who);
             notifyItemInserted(0);
         }
 
         public ArrayList<String> getResults() {
             return mResults;
+        }
+
+        public void clearResults() {
+            mResults.clear();
+            mWho.clear();
         }
 
     }
@@ -521,7 +548,7 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
                 runOnUiThread(new Runnable() {
                     public void run() {
                         // wonjin added
-                        mAdapter.addResult(strResponse);
+                        mAdapter.addResult(strResponse, 1);
                         mRecyclerView.smoothScrollToPosition(0);
                     }
                 });
@@ -534,10 +561,6 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
                 if (strResponse.equals("광고")) {
                     playYoutube();
                 } else {
-                    // TODO : 인증 아닐 경우 "소을님 제거!"
-                    //if (strResponse.equals("안녕하세요 소을님!") && AUTH==0) {
-                    //    strResponse = "안녕하세요!";
-                    //}
                     mSpeaker.speakOut(strResponse);
                     while (mSpeaker != null && mSpeaker.isSpeaking()) {
                         try {
@@ -555,7 +578,7 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
                 runOnUiThread(new Runnable() {
                     public void run() {
                         // wonjin added
-                        mAdapter.addResult(strResponse);
+                        mAdapter.addResult(strResponse, 1);
                         mRecyclerView.smoothScrollToPosition(0);
                     }
                 });
@@ -699,7 +722,7 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
         public void onFailure(Call call, IOException e) {
             Log.w("authPayCallback", "authPay failed");
             STATUS = 0;
-            lightLoop(200);
+            lightLoop(3000);
         }
 
         @Override
